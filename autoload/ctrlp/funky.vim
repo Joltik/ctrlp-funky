@@ -71,16 +71,6 @@ endfunction
 
 " script local funcs {{{
 " TODO: some functions should be defined under ctrlp#funky#utils namespace
-function! s:syntax(filetype)
-  if !ctrlp#nosy()
-    if s:syntax_highlight
-      let &filetype = a:filetype
-    endif
-
-    call ctrlp#hicheck('CtrlPTabExtra', 'Comment')
-    syn match CtrlPTabExtra '\t\zs#.*:\d\+:\d\+$'
-  endif
-endfunction
 
 function! s:error(msg)
     echohl ErrorMsg | echomsg a:msg | echohl NONE
@@ -221,6 +211,7 @@ endfunction
 "
 " Return: List
 " FIXME: refactoring
+let s:candidates = []
 function! ctrlp#funky#init(bufnr)
   " ControlP buffer is active when this function is invoked
   try
@@ -241,7 +232,7 @@ function! ctrlp#funky#init(bufnr)
       let bufs = [a:bufnr]
     endif
 
-    let candidates = ctrlp#funky#candidates(bufs)
+    let s:candidates = ctrlp#funky#candidates(bufs)
 
     " activate the former buffer
     noautocmd execute 'buffer ' . bufname(a:bufnr)
@@ -249,9 +240,8 @@ function! ctrlp#funky#init(bufnr)
     let filetype = s:filetype(a:bufnr)
 
     noautocmd execute ctrlp_winnr . 'wincmd w'
-    if len(bufs) == 1 | call s:syntax(filetype) | endif
 
-    return candidates
+    return s:candidates
   finally
     let &eventignore = saved_ei
   endtry
@@ -308,7 +298,16 @@ function! ctrlp#funky#funky(word, ...)
     let s:is_multi_buffers = get(opts, 'multi_buffers', 0)
 
     let s:winnr = winnr()
-    call ctrlp#init(ctrlp#funky#id())
+		let s:bufnr = bufnr('')
+    call ctrlp#funky#init(s:bufnr)
+
+    let opts = {
+        \ 'source': s:candidates,
+        \ 'sink*': function('ctrlp#funky#accept'),
+        \ 'options': ['--expect=ctrl-t,ctrl-v,ctrl-x', '--ansi', '--prompt=Funky> '] + g:coc_fzf_opts,
+        \ }
+    call fzf#run(fzf#wrap(opts))
+
   finally
     if exists('default_input_save')
       let g:ctrlp_default_input = default_input_save
@@ -512,33 +511,9 @@ let s:use_cache = s:cache.is_enabled()
 
 call s:fu.debug('INFO: use_cache? ' . (s:use_cache ? 'TRUE' : 'FALSE'))
 
-" The main variable for this extension.
-"
-" The values are:
-" + the name of the input function (including the brackets and any argument)
-" + the name of the action function (only the name)
-" + the long and short names to use for the statusline
-" + the matching type: line, path, tabs, tabe
-"                      |     |     |     |
-"                      |     |     |     `- match last tab delimited str
-"                      |     |     `- match first tab delimited str
-"                      |     `- match full line like file/dir path
-"                      `- match full line
-let g:ctrlp_ext_vars = get(g:, 'ctrlp_ext_vars', [])
-call add(g:ctrlp_ext_vars, {
-  \ 'init':   'ctrlp#funky#init(s:crbufnr)',
-  \ 'accept': 'ctrlp#funky#accept',
-  \ 'lname':  'funky',
-  \ 'sname':  'fky',
-  \ 'type':   s:matchtype,
-  \ 'exit':  'ctrlp#funky#exit()',
-  \ 'nolim':  get(g:, 'ctrlp_funky_nolim', 0),
-  \ 'sort':   0
-  \ })
-
 " Give the extension an ID
-let g:ctrlp_builtins = get(g:, 'ctrlp_builtins', 0)
-let s:id = g:ctrlp_builtins + len(g:ctrlp_ext_vars)
+" let g:ctrlp_builtins = get(g:, 'ctrlp_builtins', 0)
+" let s:id = g:ctrlp_builtins + len(g:ctrlp_ext_vars)
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
