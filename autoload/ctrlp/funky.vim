@@ -403,26 +403,28 @@ endfunction
 "  a:mode   the mode that has been chosen by pressing <cr> <c-v> <c-t> or <c-x>
 "           the values are 'e', 'v', 't' and 'h', respectively
 "  a:str    the selected string
-function! ctrlp#funky#accept(mode, str)
+function! ctrlp#funky#accept(item)
   " always back to former window
-  call ctrlp#exit()
+  if len(a:item) < 2 | return | endif
+  let l:pos = stridx(a:item[1], ' ')
+  let l:str = a:item[1][pos+1:-1]
 
-  let bufnr = matchstr(a:str, ':\zs\d\+\ze:')
+  let cmd = get({'ctrl-x': 'h',
+               \ 'ctrl-v': 'v',
+               \ 'ctrl-t': 't'}, a:item[0], 'e')
+
+  let bufnr = matchstr(l:str, ':\zs\d\+\ze:')
   " should be current window = former window
-  let lnum = matchstr(a:str, '\d\+$')
+  let lnum = matchstr(l:str, '\d\+$')
   execute 'noautocmd ' . get(s:, 'winnr', 1) . 'wincmd w'
-  call s:load_buffer_by_number(bufnr, a:mode)
+  call s:load_buffer_by_number(bufnr, cmd)
   call cursor(lnum, 1)
 
   call s:after_jump()
 
   if !s:sort_by_mru | return | endif
 
-  call s:mru.prioritise(bufnr, s:str2def(a:str))
-endfunction
-
-function! ctrlp#funky#exit()
-  if !empty(s:errmsg) | call s:error(s:errmsg) | endif
+  call s:mru.prioritise(bufnr, s:str2def(l:str))
 endfunction
 
 " Allow it to be called later
